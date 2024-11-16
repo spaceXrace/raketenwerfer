@@ -239,7 +239,7 @@ cv2.namedWindow("preview")
 
 def Raketenregelung(x,y):
     
-    if ((abs(x) > Threshold) & (abs(y) > Threshold)):
+    if ((abs(x) > SlowThreshold) & (abs(y) > SlowThreshold)):
         if (abs(abs(x)-abs(y)) < DifferenceThreshold):
             try:
                 if ((x < 0) & y < 0):
@@ -252,54 +252,58 @@ def Raketenregelung(x,y):
                     launcher.send_command(UP_LEFT)
 
                 delay = (abs(x) + abs(y))/1300
-            except Exception as e:
-                print(f"Fehler beim Senden des Befehls: {e}")
-
-    if abs(x) > Threshold:
-        try:
-            if x < 0:
-                if abs (x) < SlowThreshold:
-                    launcher.send_command(SLOW_LEFT)
-                    #print('sl')
-                else:
-                    launcher.send_command(LEFT)
-                    #print('l')
-            else:
-                if abs (x) < SlowThreshold:
-                    launcher.send_command(SLOW_RIGHT)
-                    #print('sr')
-                else:
-                    launcher.send_command(RIGHT)
-                    #print('r')
-
-            delay = abs(x) / 900
-            time.sleep(delay)
-            launcher.send_command(STOP)
-        except Exception as e:
-            print(f"Fehler beim Senden des Befehls: {e}")
-    print(y)
-    if abs(y) > Threshold:
-            try:
-                if y > 0:
-                    if abs (y) < SlowThreshold:
-                        launcher.send_command(SLOW_UP)
-                        #print('su')
-                    else:
-                        launcher.send_command(UP)
-                        #print('u')
-                else:
-                    if abs (y) < SlowThreshold:
-                        launcher.send_command(SLOW_DOWN)
-                        #print('sd')
-                    else:
-                        launcher.send_command(DOWN)
-                        #print('d')
-
-                delay = abs(y) / 900
                 time.sleep(delay)
                 launcher.send_command(STOP)
             except Exception as e:
                 print(f"Fehler beim Senden des Befehls: {e}")
+        else:
+                
+
+            if abs(x) > Threshold:
+                try:
+                    if x < 0:
+                        if abs (x) < SlowThreshold:
+                            launcher.send_command(SLOW_LEFT)
+                            #print('sl')
+                        else:
+                            launcher.send_command(LEFT)
+                            #print('l')
+                    else:
+                        if abs (x) < SlowThreshold:
+                            launcher.send_command(SLOW_RIGHT)
+                            #print('sr')
+                        else:
+                            launcher.send_command(RIGHT)
+                            #print('r')
+
+                    delay = abs(x) / 900
+                    time.sleep(delay)
+                    launcher.send_command(STOP)
+                except Exception as e:
+                    print(f"Fehler beim Senden des Befehls: {e}")
+            print(y)
+            if abs(y) > Threshold:
+                    try:
+                        if y > 0:
+                            if abs (y) < SlowThreshold:
+                                launcher.send_command(SLOW_UP)
+                                #print('su')
+                            else:
+                                launcher.send_command(UP)
+                                #print('u')
+                        else:
+                            if abs (y) < SlowThreshold:
+                                launcher.send_command(SLOW_DOWN)
+                                #print('sd')
+                            else:
+                                launcher.send_command(DOWN)
+                                #print('d')
+
+                        delay = abs(y) / 900
+                        time.sleep(delay)
+                        launcher.send_command(STOP)
+                    except Exception as e:
+                        print(f"Fehler beim Senden des Befehls: {e}")
     time.sleep(ImageDelay)
 
 

@@ -52,7 +52,10 @@ STOP = 32
 #// | 1 | 0 | 0 | 0 | 0 | 16 – Fire
 
 #Finetuning
-Threshold = 20
+Threshold = 20              #Minimale Distanz für Bewegung
+SlowThreshold = 60          #Maximale Distanz für langsame Bewegung
+ImageDelay = 0.4            #Delay nach Verarbeiten des Bildes
+DifferenceThreshold = 100   #Maximaler Unterschied zwischen x und y Distanz für Kombinierte Bewegung
 
 
 
@@ -237,28 +240,37 @@ cv2.namedWindow("preview")
 def Raketenregelung(x,y):
     
     if ((abs(x) > Threshold) & (abs(y) > Threshold)):
-        try:
-            if ((x < 0) & y < 0):
-                launcher.send_command(DOWN_LEFT)
-            if ((x > 0) & y < 0):
-                launcher.send_command(DOWN_RIGHT)
-            if ((x > 0) & y > 0):
-                launcher.send_command(UP_RIGHT)
-            else:
-                launcher.send_command(UP_LEFT)
+        if (abs(abs(x)-abs(y)) < DifferenceThreshold):
+            try:
+                if ((x < 0) & y < 0):
+                    launcher.send_command(DOWN_LEFT)
+                if ((x > 0) & y < 0):
+                    launcher.send_command(DOWN_RIGHT)
+                if ((x > 0) & y > 0):
+                    launcher.send_command(UP_RIGHT)
+                else:
+                    launcher.send_command(UP_LEFT)
 
-            delay = (abs(x) + abs(y))/1300
-        except Exception as e:
-            print(f"Fehler beim Senden des Befehls: {e}")
+                delay = (abs(x) + abs(y))/1300
+            except Exception as e:
+                print(f"Fehler beim Senden des Befehls: {e}")
 
     if abs(x) > Threshold:
         try:
             if x < 0:
-                launcher.send_command(LEFT)
-                #print('l')
+                if abs (x) < SlowThreshold:
+                    launcher.send_command(SLOW_LEFT)
+                    #print('sl')
+                else:
+                    launcher.send_command(LEFT)
+                    #print('l')
             else:
-                launcher.send_command(RIGHT)
-                #print('r')
+                if abs (x) < SlowThreshold:
+                    launcher.send_command(SLOW_RIGHT)
+                    #print('sr')
+                else:
+                    launcher.send_command(RIGHT)
+                    #print('r')
 
             delay = abs(x) / 900
             time.sleep(delay)
@@ -269,18 +281,26 @@ def Raketenregelung(x,y):
     if abs(y) > Threshold:
             try:
                 if y > 0:
-                    launcher.send_command(UP)
-                    print('u')
+                    if abs (y) < SlowThreshold:
+                        launcher.send_command(SLOW_UP)
+                        #print('su')
+                    else:
+                        launcher.send_command(UP)
+                        #print('u')
                 else:
-                    launcher.send_command(DOWN)
-                    print('d')
+                    if abs (y) < SlowThreshold:
+                        launcher.send_command(SLOW_DOWN)
+                        #print('sd')
+                    else:
+                        launcher.send_command(DOWN)
+                        #print('d')
 
                 delay = abs(y) / 900
                 time.sleep(delay)
                 launcher.send_command(STOP)
             except Exception as e:
                 print(f"Fehler beim Senden des Befehls: {e}")
-    time.sleep(0.4)
+    time.sleep(ImageDelay)
 
 
 

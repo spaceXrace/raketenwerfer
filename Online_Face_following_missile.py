@@ -235,6 +235,22 @@ cv2.namedWindow("preview")
 
 
 def Raketenregelung(x,y):
+    
+    if ((abs(x) > Threshold) & (abs(y) > Threshold)):
+        try:
+            if ((x < 0) & y < 0):
+                launcher.send_command(DOWN_LEFT)
+            if ((x > 0) & y < 0):
+                launcher.send_command(DOWN_RIGHT)
+            if ((x > 0) & y > 0):
+                launcher.send_command(UP_RIGHT)
+            else:
+                launcher.send_command(UP_LEFT)
+
+            delay = (abs(x) + abs(y))/1300
+        except Exception as e:
+            print(f"Fehler beim Senden des Befehls: {e}")
+
     if abs(x) > Threshold:
         try:
             if x < 0:
@@ -264,7 +280,7 @@ def Raketenregelung(x,y):
                 launcher.send_command(STOP)
             except Exception as e:
                 print(f"Fehler beim Senden des Befehls: {e}")
-    #time.sleep(0.4)
+    time.sleep(0.4)
 
 
 

@@ -27,8 +27,8 @@ RIGHT = 8
 UP_RIGHT = 10
 DOWN_RIGHT = 9
 SLOW_RIGHT = 11
-SLOW_UP = 13
-SLOW_DOWN = 14
+SLOW_UP = 14
+SLOW_DOWN = 13
 FIRE = 16
 STOP = 32
 
@@ -53,8 +53,8 @@ STOP = 32
 
 #Finetuning
 Threshold = 20              #Minimale Distanz für Bewegung
-SlowThreshold = 60          #Maximale Distanz für langsame Bewegung
-ImageDelay = 0.4            #Delay nach Verarbeiten des Bildes
+SlowThreshold = 60         #Maximale Distanz für langsame Bewegung
+ImageDelay = 0.1            #Delay nach Verarbeiten des Bildes
 DifferenceThreshold = 100   #Maximaler Unterschied zwischen x und y Distanz für Kombinierte Bewegung
 
 
@@ -172,7 +172,7 @@ lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_I
 print ("Calibrate the Launcher")
 
 launcher = Launcher(dev)
-delay = 0.5
+delay = 5
 launcher.send_command(RIGHT)
 #if launcher.state['right']:.-
 #    delay = 0
@@ -181,7 +181,7 @@ launcher.send_command(RIGHT)
 time.sleep(delay)
 launcher.send_command(STOP)
 
-delay = 0.5
+delay = 3
 launcher.send_command(LEFT)
 #if launcher.state['right']:
 #    delay = 0
@@ -244,12 +244,16 @@ def Raketenregelung(x,y):
             try:
                 if ((x < 0) and y < 0):
                     launcher.send_command(DOWN_LEFT)
+                    print('ul')
                 if ((x > 0) and y < 0):
                     launcher.send_command(DOWN_RIGHT)
+                    print('dr')
                 if ((x > 0) and y > 0):
                     launcher.send_command(UP_RIGHT)
+                    print('ur')
                 else:
                     launcher.send_command(UP_LEFT)
+                    print('ul')
 
                 delay = (abs(x) + abs(y))/1300
                 time.sleep(delay)
@@ -266,24 +270,24 @@ def Raketenregelung(x,y):
             if x < 0:
                 if abs (x) < SlowThreshold:
                     launcher.send_command(SLOW_LEFT)
-                    #print('sl')
+                    print('sl')
                 else:
                     launcher.send_command(LEFT)
-                    #print('l')
+                    print('l')
             else:
                 if abs (x) < SlowThreshold:
                     launcher.send_command(SLOW_RIGHT)
-                    #print('sr')
+                    print('sr')
                 else:
                     launcher.send_command(RIGHT)
-                    #print('r')
+                    print('r')
 
             delay = abs(x) / 900
             time.sleep(delay)
             launcher.send_command(STOP)
         except Exception as e:
             print(f"Fehler beim Senden des Befehls: {e}")
-    print(y)
+    #print(y)
     if abs(y) > Threshold:
             try:
                 if y > 0:

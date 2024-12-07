@@ -53,12 +53,8 @@ STOP = 32
 
 #Finetuning
 Threshold = 30           #Minimale Distanz für Bewegung
-
-SlowThreshold = 500         #Maximale Distanz für langsame Bewegung
-
-ImageDelay = 0.05            #Delay nach Verarbeiten des Bildes
 DifferenceThreshold = 30   #Maximaler Unterschied zwischen x und y Distanz für Kombinierte Bewegung
-
+Empfindlichkeit = 0.5 #Neigt ab etwa 2 zum Überschwingen
 
 
 
@@ -250,6 +246,8 @@ def pwm_thread(queue_pwm):
     while True:
         if not queue_pwm.empty():
             befehl, duty = queue_pwm.get()
+            if(duty)>1:
+                duty = 1
             print(befehl, duty)
         try:
             launcher.send_command(befehl)
@@ -275,10 +273,10 @@ def raketenregelung_thread(queue_rakete):
 
             # Default STOP-Befehl senden
             launcher.send_command(STOP)
-            PWM = (abs(x)+abs(y))/400
+            PWM = (abs(x)+abs(y))/300*Empfindlichkeit
             # Logik für die Bewegung
             if abs(x) > Threshold or abs(y) > Threshold:
-                if abs(x) > SlowThreshold and abs(y) > SlowThreshold:
+                if abs(x) > DifferenceThreshold and abs(y) > DifferenceThreshold:
                     if x < 0 and y < 0:
                         pwm_queue.put((DOWN_LEFT, PWM))
                         #print("Befehl: DOWN_LEFT")
@@ -292,16 +290,17 @@ def raketenregelung_thread(queue_rakete):
                         pwm_queue.put((UP_LEFT, PWM))
                         #print("Befehl: UP_LEFT")
                 else:
-                    if abs(x) > Threshold:
-                        PWM = x**2 / 260**2
-                        if x < 0:
-                            pwm_queue.put((LEFT, PWM))
-                            #print("Befehl: LEFT")
-                        else:
-                            pwm_queue.put((RIGHT, PWM))
-                            #print("Befehl: RIGHT")
+                    if abs(x) > abs(y):
+                        if abs(x) > Threshold:
+                            PWM = x**2 / 250**2 * Empfindlichkeit
+                            if x < 0:
+                                pwm_queue.put((LEFT, PWM))
+                                #print("Befehl: LEFT")
+                            else:
+                                pwm_queue.put((RIGHT, PWM))
+                                #print("Befehl: RIGHT")
                     elif abs(y) > Threshold:
-                        PWM = y**2 / 150**2
+                        PWM = y**2 / 150**2 * Empfindlichkeit
                         if y > 0:
                             pwm_queue.put((UP, PWM))
                             #print("Befehl: UP")

@@ -203,43 +203,43 @@ XPos = 0
 
 
 
-# print('starting Automatic Aim')
-#
-# # import the opencv library
-# import cv2
-# from PIL import Image
-# import face_recognition
-# import random
-#
-#
-# write_faces = False
-# show_faces = True
-# XPos = 0
-#
-# # Versuche verschiedene Indizes und prüfe, ob eine Kamera geöffnet werden kann
-# def find_camera():
-#     for i in range(5):  # Teste Kamera-Indizes von 0 bis 4
-#         print(f"Versuche Kamera mit Index {i}...")
-#         vid = cv2.VideoCapture(i, cv2.CAP_DSHOW)  # Versuche, mit DirectShow (Windows) zu öffnen
-#         if vid.isOpened():
-#             print(f"Kamera mit Index {i} erfolgreich geöffnet.")
-#             return vid
-#         else:
-#             print(f"Kamera mit Index {i} konnte nicht geöffnet werden.")
-#         vid.release()  # Kamera-Objekt nach dem Test wieder freigeben
-#     return None
-#
-# # Finde die Kamera
-# vid = find_camera()
-#
-# # Wenn keine Kamera gefunden wurde, beende das Programm
-# if vid is None:
-#     print("Fehler: Keine Kamera gefunden.")
-#     exit()
-#
-# # Weiter mit der Bildaufnahme
-# print("Video Capture in progress...")
-# cv2.namedWindow("preview")
+print('starting Automatic Aim')
+
+# import the opencv library
+import cv2
+from PIL import Image
+import face_recognition
+import random
+
+
+write_faces = False
+show_faces = True
+XPos = 0
+
+# Versuche verschiedene Indizes und prüfe, ob eine Kamera geöffnet werden kann
+def find_camera():
+    for i in range(5):  # Teste Kamera-Indizes von 0 bis 4
+        print(f"Versuche Kamera mit Index {i}...")
+        vid = cv2.VideoCapture(i, cv2.CAP_DSHOW)  # Versuche, mit DirectShow (Windows) zu öffnen
+        if vid.isOpened():
+            print(f"Kamera mit Index {i} erfolgreich geöffnet.")
+            return vid
+        else:
+            print(f"Kamera mit Index {i} konnte nicht geöffnet werden.")
+        vid.release()  # Kamera-Objekt nach dem Test wieder freigeben
+    return None
+
+# Finde die Kamera
+vid = find_camera()
+
+# Wenn keine Kamera gefunden wurde, beende das Programm
+if vid is None:
+    print("Fehler: Keine Kamera gefunden.")
+    exit()
+
+# Weiter mit der Bildaufnahme
+print("Video Capture in progress...")
+cv2.namedWindow("preview")
 
 
 

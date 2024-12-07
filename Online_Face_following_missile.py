@@ -51,9 +51,9 @@ STOP = 32
 # // | 1 | 0 | 0 | 0 | 0 | 16 – Fire
 
 # Finetuning
-Threshold = 30  # Minimale Distanz für Bewegung
-DifferenceThreshold = 30  # Maximaler Unterschied zwischen x und y Distanz für Kombinierte Bewegung
-Empfindlichkeit = 0.5  # Neigt ab etwa 2 zum Überschwingen
+Threshold = 0.05  # Minimale Distanz für Bewegung
+DifferenceThreshold = 0.3  # Maximaler Unterschied zwischen x und y Distanz für Kombinierte Bewegung
+Empfindlichkeit = 2  # Neigt ab etwa 2 zum Überschwingen
 
 dev = usb.core.find(idVendor=VENDOR, idProduct=PRODUCT)
 
@@ -193,7 +193,6 @@ def Calibrate():
     launcher.send_command(STOP)
 
 
-XPos = 0
 # Calibrate()
 
 
@@ -202,14 +201,14 @@ print('starting Automatic Aim')
 # import the opencv library
 import cv2
 import mediapipe as mp
-import random
-from queue import Queue
-import time
+
 
 write_faces = False
 show_faces = True
-XPos = 0
 
+XPos, YPos = 0,0
+BEFEHL = STOP
+PWM = 0.5
 
 # Versuche verschiedene Indizes und prüfe, ob eine Kamera geöffnet werden kann
 def find_camera():
@@ -238,17 +237,15 @@ print("Video Capture in progress...")
 
 
 # PWM-Thread-Funktion
-def pwm_thread(queue_pwm):
-    Stepsize = 0.1
-    befehl = STOP
+def pwm_thread():
+    Stepsize = 0.05
     while True:
-        if not queue_pwm.empty():
-            befehl, duty = queue_pwm.get()
-            if (duty) > 1:
-                duty = 1
-            print(befehl, duty)
+        duty = PWM
+        if (duty) > 1:
+            duty = 1
+        #print(BEFEHL, duty)
         try:
-            launcher.send_command(befehl)
+            launcher.send_command(BEFEHL)
             time.sleep(Stepsize * duty)
             launcher.send_command(STOP)
             time.sleep(Stepsize * (1 - duty))
@@ -257,56 +254,48 @@ def pwm_thread(queue_pwm):
 
 
 # Raketenregelungs-Thread-Funktion
-def raketenregelung_thread(queue_rakete):
+def raketenregelung_thread():
     while True:
+        x = XPos
+        y = YPos
+        global BEFEHL
+        global PWM
         try:
-            # Werte aus der Warteschlange holen, falls verfügbar
-            if not queue_rakete.empty():
-                x, y = queue_rakete.get()
-                # print(f"[Raketenregelung] Werte erhalten: x={x:.2f}, y={y:.2f}")
-            else:
-                # print("[Raketenregelung] Keine neuen Werte in der Warteschlange.")
-                time.sleep(0.1)  # Verhindert hohe CPU-Auslastung bei leerer Warteschlange
-                continue
-
-            # Default STOP-Befehl senden
-            launcher.send_command(STOP)
-            PWM = (abs(x) + abs(y)) / 300 * Empfindlichkeit
-            # Logik für die Bewegung
             if abs(x) > Threshold or abs(y) > Threshold:
                 if abs(x) > DifferenceThreshold and abs(y) > DifferenceThreshold:
+                    PWM = (abs(x) + abs(y))**2 * Empfindlichkeit/2
                     if x < 0 and y < 0:
-                        pwm_queue.put((DOWN_LEFT, PWM))
+                        BEFEHL = DOWN_LEFT
                         # print("Befehl: DOWN_LEFT")
                     elif x > 0 and y < 0:
-                        pwm_queue.put((DOWN_RIGHT, PWM))
+                        BEFEHL = DOWN_RIGHT
                         # print("Befehl: DOWN_RIGHT")
                     elif x > 0 and y > 0:
-                        pwm_queue.put((UP_RIGHT, PWM))
+                        BEFEHL = UP_RIGHT
                         # print("Befehl: UP_RIGHT")
                     else:
-                        pwm_queue.put((UP_LEFT, PWM))
+                        BEFEHL = UP_LEFT
                         # print("Befehl: UP_LEFT")
                 else:
                     if abs(x) > abs(y):
                         if abs(x) > Threshold:
-                            PWM = x ** 2 / 250 ** 2 * Empfindlichkeit
+                            PWM = x**2 * Empfindlichkeit
                             if x < 0:
-                                pwm_queue.put((LEFT, PWM))
+                                BEFEHL = LEFT
                                 # print("Befehl: LEFT")
                             else:
-                                pwm_queue.put((RIGHT, PWM))
+                               BEFEHL = RIGHT
                                 # print("Befehl: RIGHT")
                     elif abs(y) > Threshold:
-                        PWM = y ** 2 / 150 ** 2 * Empfindlichkeit
+                        PWM = y**2 * Empfindlichkeit
                         if y > 0:
-                            pwm_queue.put((UP, PWM))
+                            BEFEHL = UP
                             # print("Befehl: UP")
                         else:
-                            pwm_queue.put((DOWN, PWM))
+                            BEFEHL = DOWN
                             # print("Befehl: DOWN")
             else:
-                pwm_queue.put((STOP, PWM))
+                befehl = STOP
                 print("Befehl: STOP")
 
         except Exception as e:
@@ -314,13 +303,10 @@ def raketenregelung_thread(queue_rakete):
 
 
 # Warteschlangen für die Threads
-pwm_queue = Queue()
-raketenregelung_queue = Queue()
 
 # Threads starten
-pwm = threading.Thread(target=pwm_thread, args=(pwm_queue,), name="pwm", daemon=True)
-raketenregelung = threading.Thread(target=raketenregelung_thread, args=(raketenregelung_queue,), name="raketenregelung",
-                                   daemon=True)
+pwm = threading.Thread(target=pwm_thread,  name="pwm", daemon=True)
+raketenregelung = threading.Thread(target=raketenregelung_thread, name="raketenregelung",daemon=True)
 
 pwm.start()
 raketenregelung.start()
@@ -368,9 +354,8 @@ try:
             if closest_x:
                 # Map closest_face x_center/y_center to motor coordinates
 
-                print(closest_x, " ", closest_y)
-
-                raketenregelung_queue.put((closest_x-0.5)*300, (closest_y-0.5)*300)
+                XPos = (closest_x-0.5)*2
+                YPos = -1*(closest_y-0.5)*2
 
                 # Draw the bounding box on the frame
                 h, w, _ = frame.shape
@@ -378,10 +363,10 @@ try:
                     frame,
                     (int(bbox.xmin * w), int(bbox.ymin * h)),
                     (int((bbox.xmin + bbox.width) * w), int((bbox.ymin + bbox.height) * h)),
-                    (255, 0, 0),
-                    2,
-                )
-
+                    (255, 0, 0),2,)
+            else:
+                XPos = 0
+                YPos = 0
         cv2.imshow('Face Tracking', frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -390,5 +375,6 @@ except KeyboardInterrupt:
     launcher.send_command(STOP)
 
 cap.release()
+launcher.send_command(STOP)
 cv2.destroyAllWindows()
 

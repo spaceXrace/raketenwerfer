@@ -53,7 +53,7 @@ STOP = 32
 # Finetuning
 Threshold = 0.05  # Minimale Distanz für Bewegung
 DifferenceThreshold = 0.3  # Maximaler Unterschied zwischen x und y Distanz für Kombinierte Bewegung
-Empfindlichkeit = 2  # Neigt ab etwa 2 zum Überschwingen
+Empfindlichkeit = 3  # Neigt ab etwa 2 zum Überschwingen
 
 dev = usb.core.find(idVendor=VENDOR, idProduct=PRODUCT)
 
@@ -312,7 +312,10 @@ pwm.start()
 raketenregelung.start()
 
 mp_face_detection = mp.solutions.face_detection
-face_detection = mp_face_detection.FaceDetection(min_detection_confidence=0.5)
+face_detection = mp_face_detection.FaceDetection(min_detection_confidence=0.9)
+mp_holistic = mp.solutions.holistic
+holistic = mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+
 
 frame_center_x = None
 frame_center_y = None
@@ -365,8 +368,31 @@ try:
                     (int((bbox.xmin + bbox.width) * w), int((bbox.ymin + bbox.height) * h)),
                     (255, 0, 0),2,)
             else:
-                XPos = 0
-                YPos = 0
+                # Wenn kein Gesicht gefunden wurde, versuche Personen zu erkennen
+                results = holistic.process(rgb_frame)
+                if results.pose_landmarks:
+                    # Zeichne die erkannten Landmarken der Person (Körperpose)
+                    mp.solutions.drawing_utils.draw_landmarks(
+                        frame, results.pose_landmarks, mp_holistic.POSE_CONNECTIONS
+                    )
+        
+                    # Bestimme das rechteckige Bbox für den Körper (z.B. basierend auf den Hüften und Schultern)
+                    h, w, _ = frame.shape
+                    # Angenommen, wir verwenden die x- und y-Positionen der Hüfte und Schulter
+                    left_shoulder = results.pose_landmarks.landmark[mp_holistic.PoseLandmark.LEFT_SHOULDER]
+                    right_shoulder = results.pose_landmarks.landmark[mp_holistic.PoseLandmark.RIGHT_SHOULDER]
+                    left_hip = results.pose_landmarks.landmark[mp_holistic.PoseLandmark.LEFT_HIP]
+                    right_hip = results.pose_landmarks.landmark[mp_holistic.PoseLandmark.RIGHT_HIP]
+        
+                    # Berechne die Bbox, die den Körper umgibt
+                    xmin = int(min(left_shoulder.x, right_shoulder.x) * w)
+                    xmax = int(max(left_hip.x, right_hip.x) * w)
+                    ymin = int(min(left_shoulder.y, left_hip.y) * h)
+                    ymax = int(max(right_shoulder.y, right_hip.y) * h)
+        
+                    # Zeichne das Rechteck um die erkannte Person
+                    cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
+        
         cv2.imshow('Face Tracking', frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

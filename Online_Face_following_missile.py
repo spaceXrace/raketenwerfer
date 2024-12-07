@@ -324,6 +324,13 @@ raketenregelung = threading.Thread(target=raketenregelung_thread, args=(raketenr
 
 pwm.start()
 raketenregelung.start()
+
+mp_face_detection = mp.solutions.face_detection
+face_detection = mp_face_detection.FaceDetection(min_detection_confidence=0.5)
+
+frame_center_x = None
+frame_center_y = None
+
 # Hauptschleife zur kontinuierlichen Datenübergabe
 try:
     while cap.isOpened():
@@ -362,8 +369,6 @@ try:
                 # Map closest_face x_center/y_center to motor coordinates
 
                 print(closest_x, " ", closest_y)
-
-                raketenregelung_queue.put((closest_x-0.5)*600, (closest_y-0.5)*400)
 
                 # Draw the bounding box on the frame
                 h, w, _ = frame.shape

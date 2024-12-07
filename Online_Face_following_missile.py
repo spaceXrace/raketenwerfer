@@ -210,6 +210,8 @@ import cv2
 from PIL import Image
 import face_recognition
 import random
+from queue import Queue
+import time
 
 
 write_faces = False
@@ -241,108 +243,131 @@ if vid is None:
 print("Video Capture in progress...")
 cv2.namedWindow("preview")
 
+# PWM-Thread-Funktion
+def pwm_thread(queue_pwm):
+    Stepsize = 0.1
+    befehl = STOP
+    while True:
+        if not queue_pwm.empty():
+            befehl, duty = queue_pwm.get()
+            print(befehl, duty)
+        try:
+            launcher.send_command(befehl)
+            time.sleep(Stepsize*duty)
+            launcher.send_command(STOP)
+            time.sleep(Stepsize*(1-duty))
+        except Exception as e:
+            print(f"[Raketenregelung] Fehler: {e}")
 
 
-def Raketenregelung(x,y):
-    print(x,y)
-    calibrated = 0
-    launcher.send_command(STOP)
-    if abs(x) > Threshold or abs(y) > Threshold:
-        if ((abs(x) > SlowThreshold) and (abs(y) > SlowThreshold)):
-            #if (abs(abs(x)-abs(y)) < DifferenceThreshold):
-                try:
-                    if ((x < 0) and y < 0):
-                        launcher.send_command(DOWN_LEFT)
-                        print('ul')
-                    if ((x > 0) and y < 0):
-                        launcher.send_command(DOWN_RIGHT)
-                        print('dr')
-                    if ((x > 0) and y > 0):
-                        launcher.send_command(UP_RIGHT)
-                        print('ur')
-                    else:
-                        launcher.send_command(UP_LEFT)
-                        print('ul')
-                    pass
-                    
-                except Exception as e:
-                    print(f"Fehler beim Senden des Befehls: {e}")
-        else:
-            if abs(x) > Threshold:
-                try:
-                    if x < 0:
-                            launcher.send_command(LEFT)
-                    else:
-                            launcher.send_command(RIGHT)
-                except Exception as e:
-                    print(f"Fehler beim Senden des Befehls: {e}")
+# Raketenregelungs-Thread-Funktion
+def raketenregelung_thread(queue_rakete):
+    while True:
+        try:
+            # Werte aus der Warteschlange holen, falls verfügbar
+            if not queue_rakete.empty():
+                x, y = queue_rakete.get()
+                #print(f"[Raketenregelung] Werte erhalten: x={x:.2f}, y={y:.2f}")
             else:
-                if abs(y) > Threshold:
-                        try:
-                            if y > 0:
-                                launcher.send_command(UP)
-                            else:
-                                launcher.send_command(DOWN)
-                        except Exception as e:
-                            print(f"Fehler beim Senden des Befehls: {e}")
-                
-    else:
-        launcher.send_command(STOP)
-    
-    
-    
-    
-                
-    
-    
+               # print("[Raketenregelung] Keine neuen Werte in der Warteschlange.")
+                time.sleep(0.1)  # Verhindert hohe CPU-Auslastung bei leerer Warteschlange
+                continue
+
+            # Default STOP-Befehl senden
+            launcher.send_command(STOP)
+            PWM = (abs(x)+abs(y))/400
+            # Logik für die Bewegung
+            if abs(x) > Threshold or abs(y) > Threshold:
+                if abs(x) > SlowThreshold and abs(y) > SlowThreshold:
+                    if x < 0 and y < 0:
+                        pwm_queue.put((DOWN_LEFT, PWM))
+                        #print("Befehl: DOWN_LEFT")
+                    elif x > 0 and y < 0:
+                        pwm_queue.put((DOWN_RIGHT, PWM))
+                        #print("Befehl: DOWN_RIGHT")
+                    elif x > 0 and y > 0:
+                        pwm_queue.put((UP_RIGHT, PWM))
+                        #print("Befehl: UP_RIGHT")
+                    else:
+                        pwm_queue.put((UP_LEFT, PWM))
+                        #print("Befehl: UP_LEFT")
+                else:
+                    if abs(x) > Threshold:
+                        PWM = x**2 / 260**2
+                        if x < 0:
+                            pwm_queue.put((LEFT, PWM))
+                            #print("Befehl: LEFT")
+                        else:
+                            pwm_queue.put((RIGHT, PWM))
+                            #print("Befehl: RIGHT")
+                    elif abs(y) > Threshold:
+                        PWM = y**2 / 150**2
+                        if y > 0:
+                            pwm_queue.put((UP, PWM))
+                            #print("Befehl: UP")
+                        else:
+                            pwm_queue.put((DOWN, PWM))
+                            #print("Befehl: DOWN")
+            else:
+                pwm_queue.put((STOP, PWM))
+                print("Befehl: STOP")
+
+        except Exception as e:
+            print(f"[Raketenregelung] Fehler: {e}")
 
 
-time_since_last_face = 0
-XPos_target = 0
-YPos_target = 0
-XPos_target = 0
-YPos_target = 0
-Last_Xpos = 0
-Last_Ypos = 0
-while True:
 
-    ret, frame = vid.read()
-    if not ret:
-        print("Fehler beim Aufnehmen des Frames.")
-        break
-    # Gesichter im Frame finden
-    Last_Xpos = XPos_target
-    Last_Ypos = YPos_target
-    face_locations = face_recognition.face_locations(frame)
-    if face_locations != []:
-        for face_location in face_locations:
-            top, right, bottom, left = face_location
-            #print("Ein Gesicht gefunden bei: Top: {}, Left: {}, Bottom: {}, Right: {}".format(top, left, bottom, right))
-            face_image = frame[top:bottom, left:right]
-            pil_image = Image.fromarray(face_image)
-            cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 3)  # Grün, Dicke 3 #optional für visuelle makierung von Gesicht
-            
-            XPos_target = (left +right)/2 -300
-            YPos_target = -1* ((bottom + top)/2 -200)
-            Delta_x = XPos_target - Last_Xpos
-            Delta_y = YPos_target - Last_Ypos
-            Raketenregelung(XPos_target + 5* Delta_x, YPos_target + 5* Delta_y)
-    else: #Kein Gesicht gefunden
-        Raketenregelung(0, 0)
-            
+# Warteschlangen für die Threads
+pwm_queue = Queue()
+raketenregelung_queue = Queue()
 
+# Threads starten
+pwm = threading.Thread(target=pwm_thread, args=(pwm_queue,), name="pwm", daemon=True)
+raketenregelung = threading.Thread(target=raketenregelung_thread, args=(raketenregelung_queue,), name="raketenregelung", daemon=True)
 
-    
-    if show_faces:
-        # Zeige das aktuelle Bild im Fenster
-        if frame is None:
-            print("Kein Frame aufgenommen.")
-            continue
-        
-        cv2.imshow("preview", frame)
-        
-        if cv2.waitKey(1) & 0xFF == ord('q'): 
+pwm.start()
+raketenregelung.start()
+# Hauptschleife zur kontinuierlichen Datenübergabe
+try:
+    while True:
+        ret, frame = vid.read()
+        if not ret:
+            print("Fehler beim Aufnehmen des Frames.")
             break
+        # Gesichter im Frame finden
+        face_locations = face_recognition.face_locations(frame)
+        if face_locations != []:
+            for face_location in face_locations:
+                top, right, bottom, left = face_location
+                #print("Ein Gesicht gefunden bei: Top: {}, Left: {}, Bottom: {}, Right: {}".format(top, left, bottom, right))
+                face_image = frame[top:bottom, left:right]
+                pil_image = Image.fromarray(face_image)
+                cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 3)  # Grün, Dicke 3 #optional für visuelle makierung von Gesicht
+                
+                XPos_target = (left +right)/2 -300
+                YPos_target = -1* ((bottom + top)/2 -200)
+                raketenregelung_queue.put((XPos_target, YPos_target))
+                # Warteschlangenstatus überwachen
+                #print(f"[Debug] Warteschlange Raketenregelung Größe: {raketenregelung_queue.qsize()}")
+        else: #Kein Gesicht gefunden
+            raketenregelung_queue.put((0,0))
+                
+
+
+        
+        if show_faces:
+            # Zeige das aktuelle Bild im Fenster
+            if frame is None:
+                print("Kein Frame aufgenommen.")
+                continue
+            
+            cv2.imshow("preview", frame)
+            
+            if cv2.waitKey(1) & 0xFF == ord('q'): 
+                break
+except KeyboardInterrupt:
+        print("Programm beendet.")
+        launcher.send_command(STOP)
 
 # Nach der Schleife das Video-Capturing-Objekt freigeben
 vid.release()

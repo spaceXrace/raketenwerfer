@@ -52,10 +52,12 @@ STOP = 32
 #// | 1 | 0 | 0 | 0 | 0 | 16 – Fire
 
 #Finetuning
-Threshold = 20              #Minimale Distanz für Bewegung
-SlowThreshold = 60         #Maximale Distanz für langsame Bewegung
-ImageDelay = 0.1            #Delay nach Verarbeiten des Bildes
-DifferenceThreshold = 100   #Maximaler Unterschied zwischen x und y Distanz für Kombinierte Bewegung
+Threshold = 50              #Minimale Distanz für Bewegung
+
+SlowThreshold = 500         #Maximale Distanz für langsame Bewegung
+
+ImageDelay = 0.05            #Delay nach Verarbeiten des Bildes
+DifferenceThreshold = 30   #Maximaler Unterschied zwischen x und y Distanz für Kombinierte Bewegung
 
 
 
@@ -168,32 +170,38 @@ lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_I
             self.dev.ctrl_transfer(0x21, 0x09, 0x200, 0, [0x02, command, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]) ## DEVICE_THUNDER
         except usb.core.USBError as e:
             print("SEND ERROR", e)
+            
+launcher = Launcher(dev)      
+calibrated = 0  
 
-print ("Calibrate the Launcher")
+def Calibrate():
+    calibrated = 1
+    print ("Calibrate the Launcher")
+    
 
-launcher = Launcher(dev)
-delay = 5
-launcher.send_command(RIGHT)
-#if launcher.state['right']:.-
-#    delay = 0
-#else:
-#    launcher.send_command(RIGHT)
-time.sleep(delay)
-launcher.send_command(STOP)
-
-delay = 3
-launcher.send_command(LEFT)
-#if launcher.state['right']:
-#    delay = 0
-#else:
-#    launcher.send_command(UP)
-time.sleep(delay)
-launcher.send_command(STOP)
+    delay = 5
+    launcher.send_command(RIGHT)
+    #if launcher.state['right']:.-
+    #    delay = 0
+    #else:
+    #    launcher.send_command(RIGHT)
+    time.sleep(delay)
+    launcher.send_command(STOP)
+    
+    delay = 3
+    launcher.send_command(LEFT)
+    #if launcher.state['right']:
+    #    delay = 0
+    #else:
+    #    launcher.send_command(UP)
+    time.sleep(delay)
+    launcher.send_command(STOP)
 
 
 XPos = 0 
+#Calibrate()
 
-#%%
+
 
 print('starting Automatic Aim')
 
@@ -201,15 +209,12 @@ print('starting Automatic Aim')
 import cv2 
 from PIL import Image
 import face_recognition
-import sys
-import time
+import random
+
 
 write_faces = False
 show_faces = True
 XPos = 0  
-
-# Versuche, verschiedene Kamera-IDs zu verwenden
-import cv2
 
 # Versuche verschiedene Indizes und prüfe, ob eine Kamera geöffnet werden kann
 def find_camera():
@@ -237,84 +242,67 @@ print("Video Capture in progress...")
 cv2.namedWindow("preview")
 
 
+
 def Raketenregelung(x,y):
-    
-    if ((abs(x) > SlowThreshold) and (abs(y) > SlowThreshold)):
-        if (abs(abs(x)-abs(y)) < DifferenceThreshold):
-            try:
-                if ((x < 0) and y < 0):
-                    launcher.send_command(DOWN_LEFT)
-                    print('ul')
-                if ((x > 0) and y < 0):
-                    launcher.send_command(DOWN_RIGHT)
-                    print('dr')
-                if ((x > 0) and y > 0):
-                    launcher.send_command(UP_RIGHT)
-                    print('ur')
-                else:
-                    launcher.send_command(UP_LEFT)
-                    print('ul')
-
-                delay = (abs(x) + abs(y))/1300
-                time.sleep(delay)
-                launcher.send_command(STOP)
-                time.sleep(ImageDelay)
-                
-                pass
-                
-            except Exception as e:
-                print(f"Fehler beim Senden des Befehls: {e}")
-                
-    if abs(x) > Threshold:
-        try:
-            if x < 0:
-                if abs (x) < SlowThreshold:
-                    launcher.send_command(SLOW_LEFT)
-                    print('sl')
-                else:
-                    launcher.send_command(LEFT)
-                    print('l')
+    print(x,y)
+    calibrated = 0
+    launcher.send_command(STOP)
+    if abs(x) > Threshold or abs(y) > Threshold:
+        if ((abs(x) > SlowThreshold) and (abs(y) > SlowThreshold)):
+            #if (abs(abs(x)-abs(y)) < DifferenceThreshold):
+                try:
+                    if ((x < 0) and y < 0):
+                        launcher.send_command(DOWN_LEFT)
+                        print('ul')
+                    if ((x > 0) and y < 0):
+                        launcher.send_command(DOWN_RIGHT)
+                        print('dr')
+                    if ((x > 0) and y > 0):
+                        launcher.send_command(UP_RIGHT)
+                        print('ur')
+                    else:
+                        launcher.send_command(UP_LEFT)
+                        print('ul')
+                    pass
+                    
+                except Exception as e:
+                    print(f"Fehler beim Senden des Befehls: {e}")
+        else:
+            if abs(x) > Threshold:
+                try:
+                    if x < 0:
+                            launcher.send_command(LEFT)
+                    else:
+                            launcher.send_command(RIGHT)
+                except Exception as e:
+                    print(f"Fehler beim Senden des Befehls: {e}")
             else:
-                if abs (x) < SlowThreshold:
-                    launcher.send_command(SLOW_RIGHT)
-                    print('sr')
-                else:
-                    launcher.send_command(RIGHT)
-                    print('r')
-
-            delay = abs(x) / 900
-            time.sleep(delay)
-            launcher.send_command(STOP)
-        except Exception as e:
-            print(f"Fehler beim Senden des Befehls: {e}")
-    #print(y)
-    if abs(y) > Threshold:
-            try:
-                if y > 0:
-                    if abs (y) < SlowThreshold:
-                        launcher.send_command(SLOW_UP)
-                        #print('su')
-                    else:
-                        launcher.send_command(UP)
-                        #print('u')
-                else:
-                    if abs (y) < SlowThreshold:
-                        launcher.send_command(SLOW_DOWN)
-                        #print('sd')
-                    else:
-                        launcher.send_command(DOWN)
-                        #print('d')
-
-                delay = abs(y) / 900
-                time.sleep(delay)
-                launcher.send_command(STOP)
-            except Exception as e:
-                print(f"Fehler beim Senden des Befehls: {e}")
-    time.sleep(ImageDelay)
+                if abs(y) > Threshold:
+                        try:
+                            if y > 0:
+                                launcher.send_command(UP)
+                            else:
+                                launcher.send_command(DOWN)
+                        except Exception as e:
+                            print(f"Fehler beim Senden des Befehls: {e}")
+                
+    else:
+        launcher.send_command(STOP)
+    
+    
+    
+    
+                
+    
+    
 
 
+time_since_last_face = 0
+XPos_target = 0
+YPos_target = 0
 
-while True: 
+while True:
+
     ret, frame = vid.read()
     if not ret:
         print("Fehler beim Aufnehmen des Frames.")
@@ -322,6 +310,7 @@ while True:
     
     # Gesichter im Frame finden
     face_locations = face_recognition.face_locations(frame)
+    launcher.send_command(STOP)
     if face_locations != []:
         for face_location in face_locations:
             top, right, bottom, left = face_location
@@ -333,9 +322,11 @@ while True:
             XPos_target = (left +right)/2 -300
             YPos_target = -1* ((bottom + top)/2 -200)
             Raketenregelung(XPos_target, YPos_target)
+    else: #Kein Gesicht gefunden
+        Raketenregelung(0, 0)
+            
 
-    # else:
-        #print('Kein Gesicht gefunden')
+
     
     if show_faces:
         # Zeige das aktuelle Bild im Fenster

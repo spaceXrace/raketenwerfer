@@ -52,7 +52,7 @@ STOP = 32
 #// | 1 | 0 | 0 | 0 | 0 | 16 – Fire
 
 #Finetuning
-Threshold = 50              #Minimale Distanz für Bewegung
+Threshold = 30           #Minimale Distanz für Bewegung
 
 SlowThreshold = 500         #Maximale Distanz für langsame Bewegung
 
@@ -300,17 +300,20 @@ def Raketenregelung(x,y):
 time_since_last_face = 0
 XPos_target = 0
 YPos_target = 0
-
+XPos_target = 0
+YPos_target = 0
+Last_Xpos = 0
+Last_Ypos = 0
 while True:
 
     ret, frame = vid.read()
     if not ret:
         print("Fehler beim Aufnehmen des Frames.")
         break
-    
     # Gesichter im Frame finden
+    Last_Xpos = XPos_target
+    Last_Ypos = YPos_target
     face_locations = face_recognition.face_locations(frame)
-    launcher.send_command(STOP)
     if face_locations != []:
         for face_location in face_locations:
             top, right, bottom, left = face_location
@@ -321,7 +324,9 @@ while True:
             
             XPos_target = (left +right)/2 -300
             YPos_target = -1* ((bottom + top)/2 -200)
-            Raketenregelung(XPos_target, YPos_target)
+            Delta_x = XPos_target - Last_Xpos
+            Delta_y = YPos_target - Last_Ypos
+            Raketenregelung(XPos_target + 5* Delta_x, YPos_target + 5* Delta_y)
     else: #Kein Gesicht gefunden
         Raketenregelung(0, 0)
             

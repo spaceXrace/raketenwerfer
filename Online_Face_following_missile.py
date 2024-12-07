@@ -370,6 +370,8 @@ try:
 
                 print(closest_x, " ", closest_y)
 
+                raketenregelung_queue.put((closest_x-0.5)*300, (closest_y-0.5)*300)
+
                 # Draw the bounding box on the frame
                 h, w, _ = frame.shape
                 cv2.rectangle(

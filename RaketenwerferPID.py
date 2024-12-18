@@ -51,9 +51,11 @@ STOP = 32
 # // | 1 | 0 | 0 | 0 | 0 | 16 – Fire
 
 # Finetuning
-Kp = 2.5  # Proportionalfaktor
-Ki = 0.1  # Integralwert
-Kd = 0.05 # Differentialwert
+Kp = 0.6*2.6 # Proportionalfaktor
+Ki = 2*Kp/2.4  # Integralwert
+Kd = Kp*2.4/8 # Differentialwert
+dead_zone = 0.05  # Totzone
+max_integral = 10  # Begrenzung des Integralanteils
 
 DifferenceThreshold = 0.3  # Maximaler Unterschied zwischen x und y Distanz für Kombinierte Bewegung
 
@@ -257,10 +259,7 @@ def pwm_thread():
             print(f"[Raketenregelung] Fehler: {e}")
 
 
-# Raketenregelungs-Thread-Funktion
-Kp = 1.0  # Proportionalfaktor
-Ki = 0.1  # Integralwert
-Kd = 0.01 # Differentialwert
+
 
 # Globale Variablen für PID
 integral_x = 0.0

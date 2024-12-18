@@ -51,9 +51,9 @@ STOP = 32
 # // | 1 | 0 | 0 | 0 | 0 | 16 – Fire
 
 # Finetuning
-Threshold = 0.05  # Minimale Distanz für Bewegung
+Threshold = 0.08  # Minimale Distanz für Bewegung
 DifferenceThreshold = 0.3  # Maximaler Unterschied zwischen x und y Distanz für Kombinierte Bewegung
-Empfindlichkeit = 3  # Neigt ab etwa 2 zum Überschwingen
+Empfindlichkeit = 2  # Neigt ab etwa 4 zum Überschwingen
 
 dev = usb.core.find(idVendor=VENDOR, idProduct=PRODUCT)
 
@@ -243,6 +243,8 @@ def pwm_thread():
         duty = PWM
         if (duty) > 1:
             duty = 1
+        if duty < 0:
+            duty = -1*duty
         #print(BEFEHL, duty)
         try:
             launcher.send_command(BEFEHL)
@@ -257,13 +259,15 @@ def pwm_thread():
 def raketenregelung_thread():
     while True:
         x = XPos
-        y = YPos
+        y = YPos    
+        
         global BEFEHL
         global PWM
         try:
             if abs(x) > Threshold or abs(y) > Threshold:
                 if abs(x) > DifferenceThreshold and abs(y) > DifferenceThreshold:
-                    PWM = (abs(x) + abs(y))**2 * Empfindlichkeit/2
+                    PWM = (abs(x) + abs(y))**2 * Empfindlichkeit
+                    print('diagonal')
                     if x < 0 and y < 0:
                         BEFEHL = DOWN_LEFT
                         # print("Befehl: DOWN_LEFT")
@@ -277,6 +281,7 @@ def raketenregelung_thread():
                         BEFEHL = UP_LEFT
                         # print("Befehl: UP_LEFT")
                 else:
+                    print('gerade')
                     if abs(x) > abs(y):
                         if abs(x) > Threshold:
                             PWM = x**2 * Empfindlichkeit
@@ -296,7 +301,7 @@ def raketenregelung_thread():
                             # print("Befehl: DOWN")
             else:
                 befehl = STOP
-                print("Befehl: STOP")
+                #print("Befehl: STOP")
 
         except Exception as e:
             print(f"[Raketenregelung] Fehler: {e}")
@@ -311,10 +316,9 @@ raketenregelung = threading.Thread(target=raketenregelung_thread, name="raketenr
 pwm.start()
 raketenregelung.start()
 
-mp_face_detection = mp.solutions.face_detection
-face_detection = mp_face_detection.FaceDetection(min_detection_confidence=0.9)
-mp_holistic = mp.solutions.holistic
-holistic = mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+mp_pose = mp.solutions.pose
+mp_drawing = mp.solutions.drawing_utils
+pose = mp_pose.Pose(min_detection_confidence=0.75, min_tracking_confidence=0.75, model_complexity=1)
 
 
 frame_center_x = None
@@ -322,80 +326,63 @@ frame_center_y = None
 
 # Hauptschleife zur kontinuierlichen Datenübergabe
 try:
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
+        while cap.isOpened():
+            ret, frame = cap.read()
 
-        # Convert frame to RGB from BGR
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            if not ret:
+                print("Error: Failed to capture frame.")
+                break
 
-        if not frame_center_x:
-            frame_center_x = rgb_frame.shape[1] // 2
-            frame_center_y = rgb_frame.shape[0] // 2
+            # Get image dimensions
+            h, w, _ = frame.shape
 
-        results = face_detection.process(rgb_frame)
+            # Convert the frame to RGB
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        if results.detections:
-            closest_x = None
-            closest_y = None
-            closest_distance = float('inf')
+            # Human detection using MediaPipe Pose
+            results = pose.process(rgb_frame)
 
-            for detection in results.detections:
-                bbox = detection.location_data.relative_bounding_box
-                x_center = bbox.xmin + bbox.width / 2
-                y_center = bbox.ymin + bbox.height / 2
+            XPos, YPos = 0, 0
 
-                # Use bbox size as an approximate distance metric
-                distance = 1 / bbox.width  # Smaller width = farther face
+            if results.pose_landmarks:
+                # Get head landmarks
+                nose = results.pose_landmarks.landmark[mp_pose.PoseLandmark.NOSE]
+                left_eye = results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_EYE]
+                right_eye = results.pose_landmarks.landmark[mp_pose.PoseLandmark.RIGHT_EYE]
 
-                if distance < closest_distance:
-                    closest_distance = distance
-                    closest_x = x_center
-                    closest_y = y_center
+                # Calculate bounding box around the head based on landmarks
+                x_min = int(min(nose.x, left_eye.x, right_eye.x) * w)
+                x_max = int(max(nose.x, left_eye.x, right_eye.x) * w)
+                y_min = int(min(nose.y, left_eye.y, right_eye.y) * h)
+                y_max = int(max(nose.y, left_eye.y, right_eye.y) * h)
 
-            if closest_x:
-                # Map closest_face x_center/y_center to motor coordinates
+                closest_x = int(nose.x * w)
+                closest_y = int(nose.y * h)
 
-                XPos = (closest_x-0.5)*2
-                YPos = -1*(closest_y-0.5)*2
+                XPos = (nose.x - 0.5) * 2
+                YPos = -1 * (nose.y - 0.5) * 2
 
-                # Draw the bounding box on the frame
-                h, w, _ = frame.shape
+                # Draw landmarks and bounding box
+                mp_drawing.draw_landmarks(
+                    frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
+                    mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
+                    mp_drawing.DrawingSpec(color=(255, 0, 0), thickness=2, circle_radius=2),
+                )
+
                 cv2.rectangle(
                     frame,
-                    (int(bbox.xmin * w), int(bbox.ymin * h)),
-                    (int((bbox.xmin + bbox.width) * w), int((bbox.ymin + bbox.height) * h)),
-                    (255, 0, 0),2,)
-            else:
-                # Wenn kein Gesicht gefunden wurde, versuche Personen zu erkennen
-                results = holistic.process(rgb_frame)
-                if results.pose_landmarks:
-                    # Zeichne die erkannten Landmarken der Person (Körperpose)
-                    mp.solutions.drawing_utils.draw_landmarks(
-                        frame, results.pose_landmarks, mp_holistic.POSE_CONNECTIONS
-                    )
-        
-                    # Bestimme das rechteckige Bbox für den Körper (z.B. basierend auf den Hüften und Schultern)
-                    h, w, _ = frame.shape
-                    # Angenommen, wir verwenden die x- und y-Positionen der Hüfte und Schulter
-                    left_shoulder = results.pose_landmarks.landmark[mp_holistic.PoseLandmark.LEFT_SHOULDER]
-                    right_shoulder = results.pose_landmarks.landmark[mp_holistic.PoseLandmark.RIGHT_SHOULDER]
-                    left_hip = results.pose_landmarks.landmark[mp_holistic.PoseLandmark.LEFT_HIP]
-                    right_hip = results.pose_landmarks.landmark[mp_holistic.PoseLandmark.RIGHT_HIP]
-        
-                    # Berechne die Bbox, die den Körper umgibt
-                    xmin = int(min(left_shoulder.x, right_shoulder.x) * w)
-                    xmax = int(max(left_hip.x, right_hip.x) * w)
-                    ymin = int(min(left_shoulder.y, left_hip.y) * h)
-                    ymax = int(max(right_shoulder.y, right_hip.y) * h)
-        
-                    # Zeichne das Rechteck um die erkannte Person
-                    cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
-        
-        cv2.imshow('Face Tracking', frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+                    (x_min, y_min),
+                    (x_max, y_max),
+                    (0, 255, 0), 2
+                )
+
+            # Display the frame
+            cv2.imshow('Human Detection', frame)
+
+            # Break the loop on 'q' key press
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
 except KeyboardInterrupt:
     print("Programm beendet.")
     launcher.send_command(STOP)
